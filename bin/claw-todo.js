@@ -41,22 +41,53 @@ function statusIcon(s) {
 // Commands
 const commands = {
   add(args) {
-    const text = args.join(' ');
-    if (!text) return console.log('Usage: claw-todo add <task description>');
+    // Parse inline flags: --priority, -p, --tag, -t, --due, -d
+    let text = [];
+    let priority = 'medium';
+    let tags = [];
+    let due = null;
+    
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '--priority' || arg === '-p') {
+        priority = args[++i] || 'medium';
+        if (!['high', 'medium', 'low'].includes(priority)) {
+          console.log(`Invalid priority: ${priority}. Using medium.`);
+          priority = 'medium';
+        }
+      } else if (arg === '--tag' || arg === '-t') {
+        const tag = args[++i];
+        if (tag) tags.push(tag);
+      } else if (arg === '--due' || arg === '-d') {
+        const dateStr = args[++i];
+        if (dateStr) due = new Date(dateStr).toISOString();
+      } else {
+        text.push(arg);
+      }
+    }
+    
+    const taskText = text.join(' ');
+    if (!taskText) return console.log('Usage: claw-todo add <task> [--priority high|medium|low] [--tag tagname] [--due YYYY-MM-DD]');
     
     const todos = loadTodos();
     const todo = {
       id: generateId(),
-      text,
+      text: taskText,
       status: 'todo',
-      priority: 'medium',
+      priority,
       created: new Date().toISOString(),
-      due: null,
-      tags: []
+      due,
+      tags
     };
     todos.push(todo);
     saveTodos(todos);
-    console.log(`✓ Added: ${todo.text} [${todo.id}]`);
+    
+    const extras = [];
+    if (priority !== 'medium') extras.push(`${priorityIcon(priority)} ${priority}`);
+    if (tags.length) extras.push(`#${tags.join(' #')}`);
+    if (due) extras.push(`📅 ${formatDate(due)}`);
+    const extraStr = extras.length ? ` (${extras.join(', ')})` : '';
+    console.log(`✓ Added: ${todo.text}${extraStr} [${todo.id}]`);
   },
 
   list(args) {

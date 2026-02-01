@@ -1,0 +1,13 @@
+[
+  {
+    "id": "ml3a14juo21d",
+    "text": "Fix claw-changelog parsing",
+    "status": "todo",
+    "priority": "high",
+    "created": "2026-02-01T05:04:46.411Z",
+    "due": null,
+    "tags": [
+      "tools"
+    ]
+  }
+]
