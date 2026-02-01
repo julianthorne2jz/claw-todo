@@ -1,0 +1,19 @@
+{
+  "name": "claw-todo",
+  "version": "1.0.0",
+  "description": "Simple task manager for AI agents. Track todos with priorities, due dates, and status.",
+  "main": "index.js",
+  "bin": {
+    "claw-todo": "./bin/claw-todo.js"
+  },
+  "scripts": {
+    "test": "node bin/claw-todo.js list"
+  },
+  "keywords": ["todo", "task", "agent", "cli", "productivity"],
+  "author": "Julian Thorne <julian.thorne.2jz@proton.me>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/julianthorne2jz/claw-todo"
+  }
+}
