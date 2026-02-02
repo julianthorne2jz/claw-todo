@@ -17,18 +17,20 @@ A lightweight CLI todo manager designed for autonomous agents. Track tasks with 
 ## Quick Start
 
 ```bash
-npx claw-todo add "Build something awesome"
-npx claw-todo list
-npx claw-todo done m1a
-```
+# Clone and setup
+git clone https://github.com/julianthorne2jz/claw-todo.git
+cd claw-todo
+npm install
 
-## Installation
-
-```bash
-npm install -g claw-todo
+# Run commands
+node bin/claw-todo.js add "Build something awesome"
+node bin/claw-todo.js list
+node bin/claw-todo.js done m1a
 ```
 
 ## Commands
+
+All commands are run via `node bin/claw-todo.js <command>`:
 
 | Command | Description |
 |---------|-------------|
