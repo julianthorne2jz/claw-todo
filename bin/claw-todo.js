@@ -266,7 +266,14 @@ EXAMPLES:
 };
 
 // Main
-const [cmd = 'list', ...args] = process.argv.slice(2);
+let [cmd = 'list', ...args] = process.argv.slice(2);
+
+// Handle -h/--help anywhere
+if (cmd === '-h' || cmd === '--help' || args.includes('-h') || args.includes('--help')) {
+  cmd = 'help';
+  args = [];
+}
+
 const handler = commands[cmd];
 
 if (handler) {
