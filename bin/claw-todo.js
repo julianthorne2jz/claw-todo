@@ -137,13 +137,24 @@ const commands = {
     const json = args.includes('--json');
     const filterArgs = args.filter(a => a !== '--json' && a !== '--global' && a !== '-g');
     const todos = loadTodos();
-    const filter = filterArgs[0]; // 'all', 'done', 'active', or tag
+    const filter = filterArgs[0]; // 'all', 'done', 'active', 'overdue', 'high/med/low', or tag
     
     let filtered = todos;
-    if (filter === 'active') filtered = todos.filter(t => t.status !== 'done');
-    else if (filter === 'done') filtered = todos.filter(t => t.status === 'done');
-    else if (filter && filter !== 'all') filtered = todos.filter(t => t.tags.includes(filter));
-    else if (!filter) filtered = todos.filter(t => t.status !== 'done'); // default: active
+    const now = new Date();
+
+    if (filter === 'active') {
+      filtered = todos.filter(t => t.status !== 'done');
+    } else if (filter === 'done') {
+      filtered = todos.filter(t => t.status === 'done');
+    } else if (filter === 'overdue') {
+      filtered = todos.filter(t => t.status !== 'done' && t.due && new Date(t.due) < now);
+    } else if (['high', 'medium', 'low'].includes(filter)) {
+      filtered = todos.filter(t => t.status !== 'done' && t.priority === filter);
+    } else if (filter && filter !== 'all') {
+      filtered = todos.filter(t => t.tags.includes(filter));
+    } else if (!filter) {
+      filtered = todos.filter(t => t.status !== 'done'); // default: active
+    }
     
     if (filtered.length === 0) {
       if (json) console.log('[]');
@@ -151,9 +162,18 @@ const commands = {
       return;
     }
     
-    // Sort by priority then created
+    // Sort by priority then due date then created
     const priorityOrder = { high: 0, medium: 1, low: 2 };
-    filtered.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+    filtered.sort((a, b) => {
+      const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (pDiff !== 0) return pDiff;
+      // If both have due dates, sort by due date
+      if (a.due && b.due) return new Date(a.due) - new Date(b.due);
+      // Put due dates before non-due dates
+      if (a.due) return -1;
+      if (b.due) return 1;
+      return 0;
+    });
     
     if (json) {
       console.log(JSON.stringify(filtered, null, 2));
@@ -162,10 +182,36 @@ const commands = {
     
     console.log('\n  TASKS\n  ' + '─'.repeat(50));
     filtered.forEach(t => {
-      const due = t.due ? ` 📅 ${formatDate(t.due)}` : '';
+      let due = '';
+      if (t.due) {
+        const d = new Date(t.due);
+        const isOverdue = d < now && t.status !== 'done';
+        due = ` ${isOverdue ? '⚠️ ' : '📅 '}${formatDate(t.due)}`;
+      }
       const tags = t.tags.length ? ` #${t.tags.join(' #')}` : '';
       console.log(`  ${statusIcon(t.status)} ${priorityIcon(t.priority)} ${t.text}${due}${tags}`);
       console.log(`    └─ [${t.id}] ${t.status}`);
+    });
+    console.log();
+  },
+
+  find(args) {
+    const query = args.join(' ').toLowerCase();
+    if (!query) return console.log('Usage: claw-todo find <text>');
+    
+    const todos = loadTodos();
+    const matches = todos.filter(t => t.text.toLowerCase().includes(query) || t.tags.some(tag => tag.toLowerCase().includes(query)));
+    
+    if (matches.length === 0) return console.log('No matches found.');
+    
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    matches.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+    
+    console.log('\n  SEARCH RESULTS\n  ' + '─'.repeat(50));
+    matches.forEach(t => {
+       const due = t.due ? ` 📅 ${formatDate(t.due)}` : '';
+       console.log(`  ${statusIcon(t.status)} ${priorityIcon(t.priority)} ${t.text}${due}`);
+       console.log(`    └─ [${t.id}] ${t.status}`);
     });
     console.log();
   },
@@ -263,6 +309,22 @@ const commands = {
     console.log(`🗑️  Removed: ${removed.text}`);
   },
 
+  edit(args) {
+    const id = args[0];
+    const newText = args.slice(1).join(' ');
+    
+    if (!id || !newText) return console.log('Usage: claw-todo edit <id> <new text>');
+    
+    const todos = loadTodos();
+    const todo = todos.find(t => t.id === id || t.id.startsWith(id));
+    if (!todo) return console.log(`Task not found: ${id}`);
+    
+    const oldText = todo.text;
+    todo.text = newText;
+    saveTodos(todos);
+    console.log(`📝 Updated: "${oldText}" → "${newText}"`);
+  },
+
   clear() {
     const todos = loadTodos();
     const active = todos.filter(t => t.status !== 'done');
@@ -334,14 +396,17 @@ claw-todo - Task manager for AI agents
 
 COMMANDS:
   add <text>              Add a new task
-  list [all|done|active]  List tasks (default: active)
-  list <tag>              List tasks with specific tag
+  list [filter]           List tasks
+                          Filters: all, done, active (default), overdue,
+                                   high, medium, low, or <tag>
+  find <text>             Search tasks by text or tag
   done <id>               Mark task as complete
   doing <id>              Mark task as in progress
   block <id>              Mark task as blocked
   priority <id> <level>   Set priority (high/medium/low)
   due <id> <YYYY-MM-DD>   Set due date
   tag <id> <tags...>      Add tags to task
+  edit <id> <text>        Update task text
   rm <id>                 Remove a task
   clear                   Remove all completed tasks
   init                    Create TODO.json in current dir
@@ -359,7 +424,8 @@ ENVIRONMENT:
 EXAMPLES:
   claw-todo init               # Start a new list here
   claw-todo add "Fix bug"      # Adds to nearest TODO.json
-  claw-todo list -g            # List global tasks
+  claw-todo list high          # List high priority tasks
+  claw-todo find "bug"         # Search for "bug"
 `);
   }
 };
