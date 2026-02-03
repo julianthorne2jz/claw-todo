@@ -2,22 +2,58 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // Config
-const TODO_FILE = process.env.CLAW_TODO_FILE || path.join(process.cwd(), 'TODO.json');
+const GLOBAL_FILE = path.join(os.homedir(), '.claw-todo.json');
+
+function findTodoFile(args) {
+  if (process.env.CLAW_TODO_FILE) return process.env.CLAW_TODO_FILE;
+  
+  // Check for global flag anywhere in args
+  if (process.argv.includes('--global') || process.argv.includes('-g')) {
+    return GLOBAL_FILE;
+  }
+
+  // Search up for TODO.json
+  let current = process.cwd();
+  while (true) {
+    const file = path.join(current, 'TODO.json');
+    if (fs.existsSync(file)) return file;
+    
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  // Default to CWD (will be created here if added)
+  return path.join(process.cwd(), 'TODO.json');
+}
+
+// We delay resolution until we need it, or resolve it once?
+// Since 'init' command might want to force CWD, let's keep it flexible.
+// But mostly we need it for load/save.
+let cachedTodoFile = null;
+function getTodoFile() {
+  if (cachedTodoFile) return cachedTodoFile;
+  cachedTodoFile = findTodoFile();
+  return cachedTodoFile;
+}
 
 // Helpers
 function loadTodos() {
-  if (!fs.existsSync(TODO_FILE)) return [];
+  const file = getTodoFile();
+  if (!fs.existsSync(file)) return [];
   try {
-    return JSON.parse(fs.readFileSync(TODO_FILE, 'utf8'));
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch {
     return [];
   }
 }
 
 function saveTodos(todos) {
-  fs.writeFileSync(TODO_FILE, JSON.stringify(todos, null, 2));
+  const file = getTodoFile();
+  fs.writeFileSync(file, JSON.stringify(todos, null, 2));
 }
 
 function generateId() {
@@ -61,8 +97,8 @@ const commands = {
       } else if (arg === '--due' || arg === '-d') {
         const dateStr = args[++i];
         if (dateStr) due = new Date(dateStr).toISOString();
-      } else if (arg === '--json') {
-        // Handled at the end
+      } else if (arg === '--json' || arg === '--global' || arg === '-g') {
+        // Handled globally or at the end
       } else {
         text.push(arg);
       }
@@ -99,7 +135,7 @@ const commands = {
 
   list(args) {
     const json = args.includes('--json');
-    const filterArgs = args.filter(a => a !== '--json');
+    const filterArgs = args.filter(a => a !== '--json' && a !== '--global' && a !== '-g');
     const todos = loadTodos();
     const filter = filterArgs[0]; // 'all', 'done', 'active', or tag
     
@@ -235,6 +271,16 @@ const commands = {
     console.log(`🧹 Cleared ${removed} completed task(s)`);
   },
 
+  init() {
+    const file = path.join(process.cwd(), 'TODO.json');
+    if (fs.existsSync(file)) {
+      console.log(`TODO.json already exists in ${process.cwd()}`);
+      return;
+    }
+    fs.writeFileSync(file, '[]');
+    console.log(`Initialized empty task list in ${file}`);
+  },
+
   export() {
     const todos = loadTodos();
     const active = todos.filter(t => t.status !== 'done');
@@ -298,21 +344,22 @@ COMMANDS:
   tag <id> <tags...>      Add tags to task
   rm <id>                 Remove a task
   clear                   Remove all completed tasks
+  init                    Create TODO.json in current dir
   export                  Export tasks to Markdown
   stats                   Show task statistics
   help                    Show this help
 
 FLAGS:
   --json                  Output result as JSON (add, list)
+  --global, -g            Use global task list (~/.claw-todo.json)
 
 ENVIRONMENT:
   CLAW_TODO_FILE          Custom path for TODO.json
 
 EXAMPLES:
-  claw-todo add "Build the thing"
-  claw-todo priority abc123 high
-  claw-todo done abc
-  claw-todo list work
+  claw-todo init               # Start a new list here
+  claw-todo add "Fix bug"      # Adds to nearest TODO.json
+  claw-todo list -g            # List global tasks
 `);
   }
 };
