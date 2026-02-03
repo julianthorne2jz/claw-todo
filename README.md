@@ -1,5 +1,16 @@
 # claw-todo 📋
 
+## Install
+
+```bash
+git clone https://github.com/julianthorne2jz/claw-todo
+cd claw-todo
+npm link
+```
+
+Now you can use `claw-todo` from anywhere.
+
+
 > Simple task manager for AI agents
 
 A lightweight CLI todo manager designed for autonomous agents. Track tasks with priorities, due dates, tags, and status — all stored in a single JSON file.
