@@ -61,6 +61,8 @@ const commands = {
       } else if (arg === '--due' || arg === '-d') {
         const dateStr = args[++i];
         if (dateStr) due = new Date(dateStr).toISOString();
+      } else if (arg === '--json') {
+        // Handled at the end
       } else {
         text.push(arg);
       }
@@ -82,6 +84,11 @@ const commands = {
     todos.push(todo);
     saveTodos(todos);
     
+    if (args.includes('--json')) {
+      console.log(JSON.stringify(todo, null, 2));
+      return;
+    }
+    
     const extras = [];
     if (priority !== 'medium') extras.push(`${priorityIcon(priority)} ${priority}`);
     if (tags.length) extras.push(`#${tags.join(' #')}`);
@@ -91,8 +98,10 @@ const commands = {
   },
 
   list(args) {
+    const json = args.includes('--json');
+    const filterArgs = args.filter(a => a !== '--json');
     const todos = loadTodos();
-    const filter = args[0]; // 'all', 'done', 'active', or tag
+    const filter = filterArgs[0]; // 'all', 'done', 'active', or tag
     
     let filtered = todos;
     if (filter === 'active') filtered = todos.filter(t => t.status !== 'done');
@@ -101,13 +110,19 @@ const commands = {
     else if (!filter) filtered = todos.filter(t => t.status !== 'done'); // default: active
     
     if (filtered.length === 0) {
-      console.log('No tasks found.');
+      if (json) console.log('[]');
+      else console.log('No tasks found.');
       return;
     }
     
     // Sort by priority then created
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     filtered.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+    
+    if (json) {
+      console.log(JSON.stringify(filtered, null, 2));
+      return;
+    }
     
     console.log('\n  TASKS\n  ' + '─'.repeat(50));
     filtered.forEach(t => {
@@ -220,6 +235,39 @@ const commands = {
     console.log(`🧹 Cleared ${removed} completed task(s)`);
   },
 
+  export() {
+    const todos = loadTodos();
+    const active = todos.filter(t => t.status !== 'done');
+    const done = todos.filter(t => t.status === 'done');
+    
+    // Sort active by priority
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    active.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+    
+    let md = '# TODO List\n\n';
+    
+    if (active.length) {
+      md += '## Active\n';
+      active.forEach(t => {
+        const p = t.priority === 'high' ? '🔴 ' : t.priority === 'medium' ? '🟡 ' : '🟢 ';
+        md += `- [ ] ${p}${t.text}`;
+        if (t.tags.length) md += ` #${t.tags.join(' #')}`;
+        if (t.due) md += ` (Due: ${formatDate(t.due)})`;
+        md += ` <!-- id: ${t.id} -->\n`;
+      });
+      md += '\n';
+    }
+    
+    if (done.length) {
+      md += '## Completed\n';
+      done.forEach(t => {
+        md += `- [x] ${t.text} <!-- id: ${t.id} -->\n`;
+      });
+    }
+    
+    console.log(md);
+  },
+
   stats() {
     const todos = loadTodos();
     const byStatus = { todo: 0, doing: 0, done: 0, blocked: 0 };
@@ -250,8 +298,12 @@ COMMANDS:
   tag <id> <tags...>      Add tags to task
   rm <id>                 Remove a task
   clear                   Remove all completed tasks
+  export                  Export tasks to Markdown
   stats                   Show task statistics
   help                    Show this help
+
+FLAGS:
+  --json                  Output result as JSON (add, list)
 
 ENVIRONMENT:
   CLAW_TODO_FILE          Custom path for TODO.json
